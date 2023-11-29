@@ -1,0 +1,406 @@
+---
+title: "University of Alaska 2023 Fall Headcount"
+author: "Austin Somaduroff"
+format: 
+  pdf:
+    toc: true
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(kableExtra)
+
+# Import, Clean, Setup #########################################################
+
+## Define Orders ===============================================================
+mau_title_order <- c("UAA", "UAF", "UAS", "System Office", "Enterprise Entities", "UA Foundation")
+ir_group_order <- c("Academic Administrators", 
+                    "Officers and Senior Administrators", 
+                    "Regular Staff", 
+                    "Temporary Staff", 
+                    "Regular Faculty",
+                    "Adjunct/Temporary Faculty",
+                    "Graduate Assistants",
+                    "Student")
+
+
+## Import FTVORGN_CURRENT ======================================================
+orgn_titles <- read_excel("data/ftvorgn_current.xlsx") |> 
+  janitor::clean_names()
+
+## Import IR Freeze Data =======================================================
+### Add Employee Type, FY, mau_title -------------------------------------------
+### Filter to only include fall/spring and CY > 2013
+headcount_data <- read_excel("data/headcount_data.xlsx") |> 
+  janitor::clean_names() |> 
+  filter(substr(term_code, 5, 6) %in% c('01', '03'),
+         substr(term_code, 1, 4) >= 2013) |> 
+  mutate(emp_type = case_when(job_class_primary_code %in% c("NR", "XR", "EX", "CR") ~ "Regular Staff",
+                              job_class_primary_code %in% c("F9", "FR", "FN", "A9", "AR") ~ "Regular Faculty",
+                              job_class_primary_code %in% c("NT", "NX", "XT", "XX", "CT") ~ "Temporary Staff",
+                              job_class_primary_code %in% c("FT", "FW") ~ "Temporary Faculty",
+                              job_class_primary_code %in% c("GN", "GT") ~ "Graduate Student",
+                              job_class_primary_code %in% c("SN", "ST") ~ "Student"),
+         ir_group = case_when(job_class_primary_code %in% c("FR", "AR") ~ "Academic Administrators",
+                              job_class_primary_code %in% c("EX") ~ "Officers and Senior Administrators",
+                              job_class_primary_code %in% c("NR", "XR", "CR") ~ "Regular Staff",
+                              job_class_primary_code %in% c("NT", "NX", "XT", "XX", "CT") ~ "Temporary Staff",
+                              job_class_primary_code %in% c("GN", "GT") ~ "Graduate Assistants",
+                              job_class_primary_code %in% c("F9", "FN", "A9") ~ "Regular Faculty",
+                              job_class_primary_code %in% c("FT", "FW") ~ "Adjunct/Temporary Faculty",
+                              job_class_primary_code %in% c("SN", "ST") ~ "Student"),
+         fy = str_c('FY', str_sub(char(fiscal_year), 3, 4)),
+         mau_title = case_match(mau_code,
+                                "SPS" ~ "System Office",
+                                "XEE" ~ "Enterprise Entities",
+                                "XFD" ~ "UA Foundation",
+                                .default = mau_code))
+
+## Merge orgn_titles into headcount_data ========================================
+headcount_data <- headcount_data |> 
+  left_join(orgn_titles, join_by(department_code == orgn_code)) 
+
+# ASSOCIATE TERMS W SEQUENCE NUMBERS ############################################
+## Create Sequence Numbers ======================================================
+term_sequence_numbers <- headcount_data |> 
+  select(term_code) |> 
+  distinct() |> 
+  arrange(desc(term_code)) |> 
+  mutate(seq_no = row_number())
+
+## Join Sequence Numbers into headcount_data ====================================
+headcount_data <- headcount_data |> 
+  inner_join(term_sequence_numbers, join_by(term_code))
+
+
+```
+
+# Current Headcount
+
+## By University
+
+```{r}
+#| label: Current UA Headcount by University
+#| echo: false
+
+
+current_ua_headcount_by_university <- headcount_data |> 
+  filter(seq_no == 1) |> 
+  group_by(mau_title) |> 
+  summarise(employees = n(),
+            ft = sum(ft_pt_status == 'FT'),
+            regular = sum(regular_temporary_status == 'REGULAR')) |>
+  mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
+         regular_pct = str_c(round((regular / employees) * 100), '%')) |> 
+  arrange(factor(mau_title, levels = mau_title_order)) |> # Reorder by Factor
+  select(University = mau_title,
+         "Current Headcount" = employees,
+         "Full Time" = ft_pct,
+         "Regular" = regular_pct) 
+
+current_ua_headcount_totals_row <- headcount_data |> 
+  filter(seq_no == 1) |> 
+  summarise(employees = n(),
+            ft = sum(ft_pt_status == 'FT'),
+            regular = sum(regular_temporary_status == 'REGULAR')) |>
+  mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
+         regular_pct = str_c(round((regular / employees) * 100), '%'),
+         University = 'Total') |> 
+  select(University,
+         "Current Headcount" = employees,
+         "Full Time" = ft_pct,
+         "Regular" = regular_pct) 
+
+current_ua_headcount_by_ir_group_full <-
+  rbind(current_ua_headcount_by_university,
+        current_ua_headcount_totals_row)
+
+current_ua_headcount_by_ir_group_full |> 
+  kbl(booktabs = T,
+      align = c('l','r','r','r')) |>
+  column_spec(1, width = '2.5in') |> 
+  row_spec(0, bold = T) |> 
+  row_spec(max(row_number(current_ua_headcount_by_ir_group_full)) -1, hline_after = T) |> 
+  row_spec(max(row_number(current_ua_headcount_by_ir_group_full)), bold = T) 
+
+```
+
+## By Employee Type
+
+### UA
+
+```{r}
+#| label: Current UA Headcount by Employee Type
+#| echo: false
+
+current_ua_headcount_by_ir_emp_group <- headcount_data |> 
+  filter(seq_no == 1) |> 
+  group_by(ir_group) |> 
+  summarise(employees = n(),
+            ft = sum(ft_pt_status == 'FT'),
+            regular = sum(regular_temporary_status == 'REGULAR')) |>
+  mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
+         regular_pct = str_c(round((regular / employees) * 100), '%')) |> 
+  arrange(factor(ir_group, levels = ir_group_order)) |> # Reorder by Factor
+  select("Employee Type" = ir_group,
+         "Current Headcount" = employees,
+         "Full Time" = ft_pct,
+         "Regular" = regular_pct) 
+
+current_ua_headcount_by_ir_emp_group_totals_row <- headcount_data |> 
+  filter(seq_no == 1) |> 
+  summarise(employees = n(),
+            ft = sum(ft_pt_status == 'FT'),
+            regular = sum(regular_temporary_status == 'REGULAR')) |>
+  mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
+         regular_pct = str_c(round((regular / employees) * 100), '%'),
+         ir_group = 'Total') |> 
+  select("Employee Type" = ir_group,
+         "Current Headcount" = employees,
+         "Full Time" = ft_pct,
+         "Regular" = regular_pct) 
+
+current_ua_headcount_by_ir_group_full <-
+  rbind(current_ua_headcount_by_ir_emp_group,
+        current_ua_headcount_by_ir_emp_group_totals_row)
+
+current_ua_headcount_by_ir_group_full |> 
+  kbl(booktabs = T,
+      align = c('l','r','r','r')) |>
+  column_spec(1, width = '2.5in') |> 
+  row_spec(0, bold = T) |> 
+  row_spec(max(row_number(current_ua_headcount_by_ir_group_full)) -1, hline_after = T) |> 
+  row_spec(max(row_number(current_ua_headcount_by_ir_group_full)), bold = T) 
+```
+
+### UAA
+
+```{r}
+#| label: Current UAA Headcount by Employee Type
+#| echo: false
+
+current_uaa_headcount_by_ir_emp_group <- headcount_data |> 
+  filter(seq_no == 1,
+         mau_title == 'UAA') |> 
+  group_by(ir_group) |> 
+  summarise(employees = n(),
+            ft = sum(ft_pt_status == 'FT'),
+            regular = sum(regular_temporary_status == 'REGULAR')) |>
+  mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
+         regular_pct = str_c(round((regular / employees) * 100), '%')) |> 
+  arrange(factor(ir_group, levels = ir_group_order)) |> # Reorder by Factor
+  select("Employee Type" = ir_group,
+         "Current Headcount" = employees,
+         "Full Time" = ft_pct,
+         "Regular" = regular_pct) 
+
+current_uaa_headcount_by_ir_emp_group_totals_row <- headcount_data |> 
+  filter(seq_no == 1, 
+         mau_title == 'UAA') |> 
+  summarise(employees = n(),
+            ft = sum(ft_pt_status == 'FT'),
+            regular = sum(regular_temporary_status == 'REGULAR')) |>
+  mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
+         regular_pct = str_c(round((regular / employees) * 100), '%'),
+         ir_group = 'Total') |> 
+  select("Employee Type" = ir_group,
+         "Current Headcount" = employees,
+         "Full Time" = ft_pct,
+         "Regular" = regular_pct) 
+
+current_uaa_headcount_by_ir_group_full <-
+  rbind(current_uaa_headcount_by_ir_emp_group,
+        current_uaa_headcount_by_ir_emp_group_totals_row)
+
+current_uaa_headcount_by_ir_group_full |> 
+  kbl(booktabs = T,
+      align = c('l','r','r','r')) |>
+  column_spec(1, width = '2.5in') |> 
+  row_spec(0, bold = T) |> 
+  row_spec(max(row_number(current_uaa_headcount_by_ir_group_full)) -1, hline_after = T) |> 
+  row_spec(max(row_number(current_uaa_headcount_by_ir_group_full)), bold = T) 
+```
+
+### UAF
+
+```{r}
+#| label: Current UAF Headcount by Employee Type
+#| echo: false
+
+current_uaf_headcount_by_ir_emp_group <- headcount_data |> 
+  filter(seq_no == 1,
+         mau_title == 'UAF') |> 
+  group_by(ir_group) |> 
+  summarise(employees = n(),
+            ft = sum(ft_pt_status == 'FT'),
+            regular = sum(regular_temporary_status == 'REGULAR')) |>
+  mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
+         regular_pct = str_c(round((regular / employees) * 100), '%')) |> 
+  arrange(factor(ir_group, levels = ir_group_order)) |> # Reorder by Factor
+  select("Employee Type" = ir_group,
+         "Current Headcount" = employees,
+         "Full Time" = ft_pct,
+         "Regular" = regular_pct) 
+
+current_uaf_headcount_by_ir_emp_group_totals_row <- headcount_data |> 
+  filter(seq_no == 1, 
+         mau_title == 'UAF') |> 
+  summarise(employees = n(),
+            ft = sum(ft_pt_status == 'FT'),
+            regular = sum(regular_temporary_status == 'REGULAR')) |>
+  mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
+         regular_pct = str_c(round((regular / employees) * 100), '%'),
+         ir_group = 'Total') |> 
+  select("Employee Type" = ir_group,
+         "Current Headcount" = employees,
+         "Full Time" = ft_pct,
+         "Regular" = regular_pct) 
+
+current_uaf_headcount_by_ir_group_full <-
+  rbind(current_uaf_headcount_by_ir_emp_group,
+        current_uaf_headcount_by_ir_emp_group_totals_row)
+
+current_uaf_headcount_by_ir_group_full |> 
+  kbl(booktabs = T,
+      align = c('l','r','r','r')) |>
+  column_spec(1, width = '2.5in') |> 
+  row_spec(0, bold = T) |> 
+  row_spec(max(row_number(current_uaf_headcount_by_ir_group_full)) -1, hline_after = T) |> 
+  row_spec(max(row_number(current_uaf_headcount_by_ir_group_full)), bold = T) 
+
+
+```
+
+### UAS
+
+```{r}
+#| label: Current UAS Headcount by Employee Type
+#| echo: false
+
+current_uas_headcount_by_ir_emp_group <- headcount_data |> 
+  filter(seq_no == 1,
+         mau_title == 'UAS') |> 
+  group_by(ir_group) |> 
+  summarise(employees = n(),
+            ft = sum(ft_pt_status == 'FT'),
+            regular = sum(regular_temporary_status == 'REGULAR')) |>
+  mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
+         regular_pct = str_c(round((regular / employees) * 100), '%')) |> 
+  arrange(factor(ir_group, levels = ir_group_order)) |> # Reorder by Factor
+  select("Employee Type" = ir_group,
+         "Current Headcount" = employees,
+         "Full Time" = ft_pct,
+         "Regular" = regular_pct) 
+
+current_uas_headcount_by_ir_emp_group_totals_row <- headcount_data |> 
+  filter(seq_no == 1, 
+         mau_title == 'UAS') |> 
+  summarise(employees = n(),
+            ft = sum(ft_pt_status == 'FT'),
+            regular = sum(regular_temporary_status == 'REGULAR')) |>
+  mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
+         regular_pct = str_c(round((regular / employees) * 100), '%'),
+         ir_group = 'Total') |> 
+  select("Employee Type" = ir_group,
+         "Current Headcount" = employees,
+         "Full Time" = ft_pct,
+         "Regular" = regular_pct) 
+
+current_uas_headcount_by_ir_group_full <-
+  rbind(current_uas_headcount_by_ir_emp_group,
+        current_uas_headcount_by_ir_emp_group_totals_row)
+
+current_uas_headcount_by_ir_group_full |> 
+  kbl(booktabs = T,
+      align = c('l','r','r','r')) |>
+  column_spec(1, width = '2.5in') |> 
+  row_spec(0, bold = T) |> 
+  row_spec(max(row_number(current_uas_headcount_by_ir_group_full)) -1, hline_after = T) |> 
+  row_spec(max(row_number(current_uas_headcount_by_ir_group_full)), bold = T) 
+```
+
+### System Office, Enterprise Entities, and UA Foundation
+
+```{r}
+#| label: Current SO Headcount by Employee Type
+#| echo: false
+
+current_so_headcount_by_ir_emp_group <- headcount_data |> 
+  filter(seq_no == 1,
+         !mau_title %in% c('UAA', 'UAS', 'UAF')) |> 
+  group_by(ir_group) |> 
+  summarise(employees = n(),
+            ft = sum(ft_pt_status == 'FT'),
+            regular = sum(regular_temporary_status == 'REGULAR')) |>
+  mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
+         regular_pct = str_c(round((regular / employees) * 100), '%')) |> 
+  arrange(factor(ir_group, levels = ir_group_order)) |> # Reorder by Factor
+  select("Employee Type" = ir_group,
+         "Current Headcount" = employees,
+         "Full Time" = ft_pct,
+         "Regular" = regular_pct) 
+
+current_so_headcount_by_ir_emp_group_totals_row <- headcount_data |> 
+  filter(seq_no == 1, 
+         !mau_title %in% c('UAA', 'UAS', 'UAF')) |> 
+  summarise(employees = n(),
+            ft = sum(ft_pt_status == 'FT'),
+            regular = sum(regular_temporary_status == 'REGULAR')) |>
+  mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
+         regular_pct = str_c(round((regular / employees) * 100), '%'),
+         ir_group = 'Total') |> 
+  select("Employee Type" = ir_group,
+         "Current Headcount" = employees,
+         "Full Time" = ft_pct,
+         "Regular" = regular_pct) 
+
+current_so_headcount_by_ir_group_full <- 
+  rbind(current_so_headcount_by_ir_emp_group,
+        current_so_headcount_by_ir_emp_group_totals_row)
+
+current_so_headcount_by_ir_group_full |> 
+  kbl(booktabs = T,
+      align = c('l','r','r','r')) |>
+  column_spec(1, width = '2.5in') |> 
+  row_spec(0, bold = T) |> 
+  row_spec(max(row_number(current_so_headcount_by_ir_group_full)) -1, hline_after = T) |> 
+  row_spec(max(row_number(current_so_headcount_by_ir_group_full)), bold = T) 
+
+```
+
+### 
+
+```{r}
+#| label: current ua headcount by IR Group
+#| echo: false
+#| fig-width: 8
+#| fig-asp: 0.618
+
+#max_ir_group_xlim <- headcount_data |> 
+#  filter(seq_no == 1) |> 
+#  count(ir_group) |> 
+#  slice_max(n) |> 
+#  select(n) |> 
+#  mutate(n = round(n * 1.10))
+
+# max_ir_group_xlim <- max_ir_group_xlim$n
+
+#headcount_data |> 
+#  filter(seq_no == 1) |> 
+#  count(ir_group) |> 
+#  mutate(ir_group = factor(ir_group,
+#                    levels = rev(ir_group_order))) |> # Use this to reorder factors for bar charts (rev for reverse order)
+#  ggplot(aes(y = ir_group, x = n)) +
+#  geom_bar(stat = 'identity') +
+#  geom_text(aes(label = n), hjust = -.1) +
+#  xlim(NA, max_ir_group_xlim) +
+#  labs(title = "Employees by IR Group",
+#       x = "Employees",
+#       y = NULL)
+
+```
