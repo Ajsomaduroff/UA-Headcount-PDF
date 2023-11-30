@@ -138,6 +138,52 @@ full |>
   row_spec(max(row_number(full)), bold = T) 
 }
 
+# CURRENT HEADCOUNT BY GENDER #######################################################################
+f_hct_by_gender <- function(mau = mau_title_order) {
+grouped <- headcount_data |> 
+  filter(seq_no == 1,
+         mau_title %in% mau) |> 
+  group_by(gender) |> 
+  summarise(employees = n(),
+            ft = sum(ft_pt_status == 'FT'),
+            regular = sum(regular_temporary_status == 'REGULAR'),
+            represented = sum(bargaining_unit_member)) |>
+  mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
+         regular_pct = str_c(round((regular / employees) * 100), '%'),
+         represented_pct = str_c(round((represented / employees) * 100), '%')) |> 
+  select("Gender" = gender,
+         "Current Headcount" = employees,
+         "Full Time" = ft_pct,
+         "Regular" = regular_pct,
+         "Represented" = represented_pct) 
+
+totals <- headcount_data |> 
+  filter(seq_no == 1,
+         mau_title %in% mau) |> 
+  summarise(employees = n(),
+            ft = sum(ft_pt_status == 'FT'),
+            regular = sum(regular_temporary_status == 'REGULAR'),
+            represented = sum(bargaining_unit_member)) |>
+  mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
+         regular_pct = str_c(round((regular / employees) * 100), '%'),
+         represented_pct = str_c(round((represented / employees) * 100), '%'),
+         gender = 'Total') |> 
+  select("Gender" = gender,
+         "Current Headcount" = employees,
+         "Full Time" = ft_pct,
+         "Regular" = regular_pct,
+         "Represented" = represented_pct) 
+
+full <- rbind(grouped,
+              totals)
+full |>
+  kbl(booktabs = T,
+      align = c('l','r','r','r','r')) |>
+  column_spec(1, width = '2.5in') |>
+  row_spec(0, bold = T) |>
+  row_spec(max(row_number(full)) -1, hline_after = T) |>
+  row_spec(max(row_number(full)), bold = T)
+}
 ```
 
 # Current Headcount
@@ -283,11 +329,11 @@ f_hct_by_employee_type(so_maus)
 #| include: false
 
 
-f_hct_by_employee_type <- function(mau = mau_title_order) {
+f_hct_by_gender <- function(mau = mau_title_order) {
 grouped <- headcount_data |> 
   filter(seq_no == 1,
          mau_title %in% mau) |> 
-  group_by(ir_group) |> 
+  group_by(gender) |> 
   summarise(employees = n(),
             ft = sum(ft_pt_status == 'FT'),
             regular = sum(regular_temporary_status == 'REGULAR'),
@@ -295,8 +341,7 @@ grouped <- headcount_data |>
   mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
          regular_pct = str_c(round((regular / employees) * 100), '%'),
          represented_pct = str_c(round((represented / employees) * 100), '%')) |> 
-  arrange(factor(ir_group, levels = ir_group_order)) |> # Reorder by Factor
-  select("Employee Type" = ir_group,
+  select("Gender" = gender,
          "Current Headcount" = employees,
          "Full Time" = ft_pct,
          "Regular" = regular_pct,
@@ -312,8 +357,8 @@ totals <- headcount_data |>
   mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
          regular_pct = str_c(round((regular / employees) * 100), '%'),
          represented_pct = str_c(round((represented / employees) * 100), '%'),
-         ir_group = 'Total') |> 
-  select("Employee Type" = ir_group,
+         gender = 'Total') |> 
+  select("Gender" = gender,
          "Current Headcount" = employees,
          "Full Time" = ft_pct,
          "Regular" = regular_pct,
@@ -322,14 +367,61 @@ totals <- headcount_data |>
 full <- rbind(grouped,
               totals)
 
-full |> 
-  kbl(booktabs = T,
-      align = c('l','r','r','r','r')) |>
-  column_spec(1, width = '2.5in') |> 
-  row_spec(0, bold = T) |> 
-  row_spec(max(row_number(full)) -1, hline_after = T) |> 
-  row_spec(max(row_number(full)), bold = T) 
+full 
+# full |> 
+#   kbl(booktabs = T,
+#       align = c('l','r','r','r','r')) |>
+#   column_spec(1, width = '2.5in') |> 
+#   row_spec(0, bold = T) |> 
+#   row_spec(max(row_number(full)) -1, hline_after = T) |> 
+#   row_spec(max(row_number(full)), bold = T) 
 }
 
-f_hct_by_employee_type()
+f_hct_by_gender()
+
+f_hct_by_gender <- function(mau = mau_title_order) {
+grouped <- headcount_data |> 
+  filter(seq_no == 1,
+         mau_title %in% mau) |> 
+  group_by(gender) |> 
+  summarise(employees = n(),
+            ft = sum(ft_pt_status == 'FT'),
+            regular = sum(regular_temporary_status == 'REGULAR'),
+            represented = sum(bargaining_unit_member)) |>
+  mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
+         regular_pct = str_c(round((regular / employees) * 100), '%'),
+         represented_pct = str_c(round((represented / employees) * 100), '%')) |> 
+  select("Gender" = gender,
+         "Current Headcount" = employees,
+         "Full Time" = ft_pct,
+         "Regular" = regular_pct,
+         "Represented" = represented_pct) 
+
+totals <- headcount_data |> 
+  filter(seq_no == 1,
+         mau_title %in% mau) |> 
+  summarise(employees = n(),
+            ft = sum(ft_pt_status == 'FT'),
+            regular = sum(regular_temporary_status == 'REGULAR'),
+            represented = sum(bargaining_unit_member)) |>
+  mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
+         regular_pct = str_c(round((regular / employees) * 100), '%'),
+         represented_pct = str_c(round((represented / employees) * 100), '%'),
+         gender = 'Total') |> 
+  select("Gender" = gender,
+         "Current Headcount" = employees,
+         "Full Time" = ft_pct,
+         "Regular" = regular_pct,
+         "Represented" = represented_pct) 
+
+full <- rbind(grouped,
+              totals)
+full |>
+  kbl(booktabs = T,
+      align = c('l','r','r','r','r')) |>
+  column_spec(1, width = '2.5in') |>
+  row_spec(0, bold = T) |>
+  row_spec(max(row_number(full)) -1, hline_after = T) |>
+  row_spec(max(row_number(full)), bold = T)
+}
 ```
