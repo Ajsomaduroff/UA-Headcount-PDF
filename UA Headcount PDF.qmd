@@ -1,9 +1,10 @@
 ---
 title: "University of Alaska 2023 Fall Headcount"
-author: "Austin Somaduroff"
+author: "Office of Human Resources"
 format: 
   pdf:
-    toc: true
+    toc: TRUE
+    toc-depth: 3
     geometry: 
       - left=20mm
       - top=30mm
@@ -24,7 +25,7 @@ library(lubridate)
 # Import, Clean, Setup #########################################################
 
 ## Define Orders ===============================================================
-mau_title_order <- c("UAA", "UAF", "UAS", "System Office", "Enterprise Entities", "UA Foundation")
+mau_title_order <- c("UAA", "UAF", "UAS", "System Office", "Education Trust of Alaska", "UA Foundation")
 so_maus <- c("System Office", "Enterprise Entities", "UA Foundation")
 ir_group_order <- c("Academic Administrators", 
                     "Officers and Senior Administrators", 
@@ -37,6 +38,10 @@ ir_group_order <- c("Academic Administrators",
 
 ## Define Bargaining Units =====================================================
 bargaining_unit_list <- c('UAFT Faculty', 'Local 6070', 'UNAC Faculty', 'UNAD Adjunct Faculty')
+
+## Define Demographic Fields ===================================================
+demographic_fields <- c("Female", "Person of Color", "Median Age")
+demographic_threshold <- 10
 
 ## Import FTVORGN_CURRENT ======================================================
 orgn_titles <- read_excel("data/ftvorgn_current.xlsx") |> 
@@ -66,14 +71,16 @@ headcount_data <- read_excel("data/headcount_data.xlsx") |>
          fy = str_c('FY', str_sub(char(fiscal_year), 3, 4)),
          mau_title = case_match(mau_code,
                                 "SPS" ~ "System Office",
-                                "XEE" ~ "Enterprise Entities",
+                                "XEE" ~ "Education Trust of Alaska",
                                 "XFD" ~ "UA Foundation",
                                 .default = mau_code),
          bargaining_unit_member = case_when(bargaining_unit %in% bargaining_unit_list ~ TRUE,
                                             .default = FALSE),
          gender = case_when(gender == 'M' ~ 'Male',
                             gender == 'F' ~ 'Female',
-                            .default = 'Not Reported/ Other'))
+                            .default = 'Not Reported/ Other'),
+         person_of_color = case_when(substr(race_desc, 1, 1) == '7' ~ FALSE,
+                                     .default = TRUE))
 
 ## Merge orgn_titles into headcount_data ========================================
 headcount_data <- headcount_data |> 
@@ -91,7 +98,8 @@ term_sequence_numbers <- headcount_data |>
 headcount_data <- headcount_data |> 
   inner_join(term_sequence_numbers, join_by(term_code))
 
-
+# NOTES #########################################################################
+extract_date <- headcount_data |> filter(seq_no == 1) |> distinct(extract_date) |> pull()
 ```
 
 ```{r}
@@ -109,11 +117,13 @@ grouped <- headcount_data |>
             regular = sum(regular_temporary_status == 'REGULAR'),
             represented = sum(bargaining_unit_member),
             female = sum(gender == 'Female'),
+            person_of_color = sum(person_of_color),
             median_age = median(census_age)) |>
   mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
          regular_pct = str_c(round((regular / employees) * 100), '%'),
          represented_pct = str_c(round((represented / employees) * 100), '%'),
          female_pct = str_c(round((female / employees) * 100), '%'),
+         color_pct = str_c(round((person_of_color / employees) * 100), '%'),
          median_age = trunc(median_age)) |> 
   arrange(factor(ir_group, levels = ir_group_order)) |> # Reorder by Factor
   select("Employee Type" = ir_group,
@@ -121,7 +131,8 @@ grouped <- headcount_data |>
          "Full Time" = ft_pct,
          "Regular" = regular_pct,
          "Represented" = represented_pct,
-         "Female" = female_pct, 
+         "Female" = female_pct,
+         "Person of Color" = color_pct,
          "Median Age" = median_age) 
 
 totals <- headcount_data |> 
@@ -132,11 +143,13 @@ totals <- headcount_data |>
             regular = sum(regular_temporary_status == 'REGULAR'),
             represented = sum(bargaining_unit_member),
             female = sum(gender == 'Female'),
+            person_of_color = sum(person_of_color),
             median_age = median(census_age)) |>
   mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
          regular_pct = str_c(round((regular / employees) * 100), '%'),
          represented_pct = str_c(round((represented / employees) * 100), '%'),
          female_pct = str_c(round((female / employees) * 100), '%'),
+         color_pct = str_c(round((person_of_color / employees) * 100), '%'),
          median_age = trunc(median_age),
          ir_group = 'Total') |> 
   select("Employee Type" = ir_group,
@@ -145,14 +158,15 @@ totals <- headcount_data |>
          "Regular" = regular_pct,
          "Represented" = represented_pct,
          "Female" = female_pct,
-         "Median Age" = median_age) 
+         "Person of Color" = color_pct,
+         "Median Age" = median_age)
 
 full <- rbind(grouped,
         totals)
 
 full |>  
   kbl(booktabs = T,
-      align = c('l','r','r','r','r','r','r')) |>
+      align = c('l','r','r','r','r','r','r','r')) |>
   column_spec(1, width = '2.3in') |> 
   row_spec(0, bold = T) |> 
   row_spec(max(row_number(full)) -1, hline_after = T) |> 
@@ -177,12 +191,14 @@ current_ua_headcount_by_university <- headcount_data |>
             regular = sum(regular_temporary_status == 'REGULAR'),
             represented = sum(bargaining_unit_member),
             female = sum(gender == 'Female'),
+            person_of_color = sum(person_of_color),
             median_age = median(census_age)) |>
   mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
          regular_pct = str_c(round((regular / employees) * 100), '%'),
          represented_pct = str_c(round((represented / employees) * 100), '%'),
          female_pct = str_c(round((female / employees) * 100), '%'),
-         median_age = trunc(median_age)) |> 
+         color_pct = str_c(round((person_of_color / employees) * 100), '%'),
+         median_age = trunc(median_age)) |>
   arrange(factor(mau_title, levels = mau_title_order)) |> # Reorder by Factor
   select(University = mau_title,
          "Headcount" = employees,
@@ -190,6 +206,7 @@ current_ua_headcount_by_university <- headcount_data |>
          "Regular" = regular_pct,
          "Represented" = represented_pct,
          "Female" = female_pct,
+         "Person of Color" = color_pct,
          "Median Age" = median_age) 
 
 current_ua_headcount_totals_row <- headcount_data |> 
@@ -199,11 +216,14 @@ current_ua_headcount_totals_row <- headcount_data |>
             regular = sum(regular_temporary_status == 'REGULAR'),
             represented = sum(bargaining_unit_member),
             female = sum(gender == 'Female'),
+            person_of_color = sum(person_of_color),
+            color_pct = str_c(round((person_of_color / employees) * 100), '%'),
             median_age = median(census_age)) |>
   mutate(ft_pct = str_c(round((ft / employees) * 100), '%'),
          regular_pct = str_c(round((regular / employees) * 100), '%'),
          represented_pct = str_c(round((represented / employees) * 100), '%'),
          female_pct = str_c(round((female / employees) * 100), '%'),
+         color_pct = str_c(round((person_of_color / employees) * 100), '%'),
          median_age = trunc(median_age),
          University = 'Total') |> 
   select(University,
@@ -212,19 +232,20 @@ current_ua_headcount_totals_row <- headcount_data |>
          "Regular" = regular_pct,
          "Represented" = represented_pct,
          "Female" = female_pct,
+         "Person of Color" = color_pct,
          "Median Age" = median_age) 
 
-current_ua_headcount_by_ir_group_full <-
+current_ua_headcount_by_university_full <-
   rbind(current_ua_headcount_by_university,
         current_ua_headcount_totals_row)
 
-current_ua_headcount_by_ir_group_full |> 
+current_ua_headcount_by_university_full |> 
   kbl(booktabs = T,
-      align =  c('l','r','r','r','r','r','r')) |>
+      align =  c('l','r','r','r','r','r','r','r')) |>
   column_spec(1, width = '2.3in') |> 
   row_spec(0, bold = T) |> 
-  row_spec(max(row_number(current_ua_headcount_by_ir_group_full)) -1, hline_after = T) |> 
-  row_spec(max(row_number(current_ua_headcount_by_ir_group_full)), bold = T) 
+  row_spec(max(row_number(current_ua_headcount_by_university_full)) -1, hline_after = T) |> 
+  row_spec(max(row_number(current_ua_headcount_by_university_full)), bold = T) 
 
 ```
 
@@ -270,7 +291,7 @@ f_hct_by_employee_type('UAF')
 f_hct_by_employee_type('UAS')
 ```
 
-### System Office, Enterprise Entities, and UA Foundation
+### System Office, Enterprise Entities, and Education Trust of Alaska
 
 ```{r}
 #| label: Current SO Headcount by Employee Type
@@ -284,7 +305,13 @@ f_hct_by_employee_type(so_maus)
 
 Data Origin: RPTP - Institutional Research Freeze Data
 
-Data Date: `r headcount_data |> filter(seq_no ==1) |>`
+Data Extract Date: `r extract_date`
+
+## Definitions
+
+#### Enterprise Entities
+
+This group is the Education Trust of Alaska
 
 ```{r}
 #| label: current ua headcount by IR Group
@@ -319,7 +346,6 @@ Data Date: `r headcount_data |> filter(seq_no ==1) |>`
 ```{r}
 #| label: scratch
 #| include: false
-
 
 
 ```
