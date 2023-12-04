@@ -125,15 +125,7 @@ grouped <- headcount_data |>
          female_pct = str_c(round((female / employees) * 100), '%'),
          color_pct = str_c(round((person_of_color / employees) * 100), '%'),
          median_age = trunc(median_age)) |> 
-  arrange(factor(ir_group, levels = ir_group_order)) |> # Reorder by Factor
-  select("Employee Type" = ir_group,
-         "Headcount" = employees,
-         "Full Time" = ft_pct,
-         "Regular" = regular_pct,
-         "Represented" = represented_pct,
-         "Female" = female_pct,
-         "Person of Color" = color_pct,
-         "Median Age" = median_age) 
+  arrange(factor(ir_group, levels = ir_group_order)) # Reorder by Factor
 
 totals <- headcount_data |> 
   filter(seq_no == 1,
@@ -151,26 +143,30 @@ totals <- headcount_data |>
          female_pct = str_c(round((female / employees) * 100), '%'),
          color_pct = str_c(round((person_of_color / employees) * 100), '%'),
          median_age = trunc(median_age),
-         ir_group = 'Total') |> 
+         ir_group = 'Total')
+
+full <-
+  rbind(grouped,
+        totals) |> 
+  mutate(female_pct = if_else(employees < 10, '-', female_pct),
+         color_pct = if_else(employees < demographic_threshold, '-', color_pct),
+         median_age = if_else(employees < demographic_threshold, '-', as.character(median_age))) |>
   select("Employee Type" = ir_group,
-         "Headcount" = employees,
+         Headcount = employees,
          "Full Time" = ft_pct,
-         "Regular" = regular_pct,
-         "Represented" = represented_pct,
-         "Female" = female_pct,
+         Regular = regular_pct,
+         Represented = represented_pct,
+         Female = female_pct,
          "Person of Color" = color_pct,
-         "Median Age" = median_age)
+         "Median Age" = median_age) 
 
-full <- rbind(grouped,
-        totals)
-
-full |>  
+full |> 
   kbl(booktabs = T,
-      align = c('l','r','r','r','r','r','r','r')) |>
+      align =  c('l','r','r','r','r','r','r','r')) |>
   column_spec(1, width = '2.3in') |> 
   row_spec(0, bold = T) |> 
-  row_spec(max(row_number(full)) -1, hline_after = T) |> 
-  row_spec(max(row_number(full)), bold = T) 
+  row_spec(as.numeric(max(rownames(full))) -1, hline_after = T) |> 
+  row_spec(as.numeric(max(rownames(full))), bold = T) 
 }
 ```
 
@@ -199,15 +195,8 @@ current_ua_headcount_by_university <- headcount_data |>
          female_pct = str_c(round((female / employees) * 100), '%'),
          color_pct = str_c(round((person_of_color / employees) * 100), '%'),
          median_age = trunc(median_age)) |>
-  arrange(factor(mau_title, levels = mau_title_order)) |> # Reorder by Factor
-  select(University = mau_title,
-         "Headcount" = employees,
-         "Full Time" = ft_pct,
-         "Regular" = regular_pct,
-         "Represented" = represented_pct,
-         "Female" = female_pct,
-         "Person of Color" = color_pct,
-         "Median Age" = median_age) 
+  arrange(factor(mau_title, levels = mau_title_order)) # Reorder by Factor
+
 
 current_ua_headcount_totals_row <- headcount_data |> 
   filter(seq_no == 1) |> 
@@ -225,27 +214,31 @@ current_ua_headcount_totals_row <- headcount_data |>
          female_pct = str_c(round((female / employees) * 100), '%'),
          color_pct = str_c(round((person_of_color / employees) * 100), '%'),
          median_age = trunc(median_age),
-         University = 'Total') |> 
-  select(University,
-         "Headcount" = employees,
-         "Full Time" = ft_pct,
-         "Regular" = regular_pct,
-         "Represented" = represented_pct,
-         "Female" = female_pct,
-         "Person of Color" = color_pct,
-         "Median Age" = median_age) 
+         mau_title = 'Total')
 
 current_ua_headcount_by_university_full <-
   rbind(current_ua_headcount_by_university,
-        current_ua_headcount_totals_row)
+        current_ua_headcount_totals_row) |> 
+  mutate(female_pct = if_else(employees < 10, '-', female_pct),
+         color_pct = if_else(employees < demographic_threshold, '-', color_pct),
+         median_age = if_else(employees < demographic_threshold, '-', as.character(median_age))) |>
+  select(University = mau_title,
+         Headcount = employees,
+         "Full Time" = ft_pct,
+         Regular = regular_pct,
+         Represented = represented_pct,
+         Female = female_pct,
+         "Person of Color" = color_pct,
+         "Median Age" = median_age) 
+
 
 current_ua_headcount_by_university_full |> 
   kbl(booktabs = T,
       align =  c('l','r','r','r','r','r','r','r')) |>
   column_spec(1, width = '2.3in') |> 
   row_spec(0, bold = T) |> 
-  row_spec(max(row_number(current_ua_headcount_by_university_full)) -1, hline_after = T) |> 
-  row_spec(max(row_number(current_ua_headcount_by_university_full)), bold = T) 
+  row_spec(as.numeric(max(rownames(current_ua_headcount_by_university_full))) -1, hline_after = T) |> 
+  row_spec(as.numeric(max(rownames(current_ua_headcount_by_university_full))), bold = T) 
 
 ```
 
@@ -306,6 +299,8 @@ f_hct_by_employee_type(so_maus)
 Data Origin: RPTP - Institutional Research Freeze Data
 
 Data Extract Date: `r extract_date`
+
+Groups of fewer than `r demographic_threshold` employees will not display demographic information.
 
 ## Definitions
 
