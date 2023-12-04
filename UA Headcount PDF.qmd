@@ -156,7 +156,8 @@ full <-
 
 full |> 
   kbl(booktabs = T,
-      align =  c('l','r','r','r','r','r','r','r')) |>
+      align =  c('l','r','r','r','r','r','r','r'),
+      linesep = "") |>
   column_spec(1, width = '2.3in') |> 
   row_spec(0, bold = T) |> 
   row_spec(as.numeric(max(rownames(full))) -1, hline_after = T) |> 
@@ -228,7 +229,8 @@ current_ua_headcount_by_university_full <-
 
 current_ua_headcount_by_university_full |> 
   kbl(booktabs = T,
-      align =  c('l','r','r','r','r','r','r','r')) |>
+      align =  c('l','r','r','r','r','r','r','r'),
+      linesep = "") |>
   column_spec(1, width = '2.3in') |> 
   row_spec(0, bold = T) |> 
   row_spec(as.numeric(max(rownames(current_ua_headcount_by_university_full))) -1, hline_after = T) |> 
@@ -337,11 +339,11 @@ Employees whose bi-weekly hours amount to a full-time workload (80 hours).
 
 #### Regular
 
-Employees who held employment with the university in a non-temporary status. Employee Classes include CR, EX, FR, F8, FN, NR, and XR.
+Employees who hold employment with the university in a non-temporary status. Employee Classes include CR, EX, FR, F8, FN, NR, and XR.
 
 #### Represented
 
-Any employee who is covered by one of the following:
+Any employee whose position allowed them to be covered by one of the following CBAs:
 
 -   UNAC Faculty (F9)
 
@@ -353,11 +355,11 @@ The UAFFA union is not presently included in the IR data freeze.
 
 #### Female
 
-Any employee who identifies as "Female".
+Any employee who identified as "Female".
 
 #### Person of Color
 
-Any employee who indicated they considered themselves to be with at least one race other than "White".
+Any employee who indicated they consider themselves to be with at least one race other than "White".
 
 #### Age
 
