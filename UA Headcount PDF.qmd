@@ -34,7 +34,7 @@ ir_group_order <- c("Academic Administrators",
                     "Regular Faculty",
                     "Adjunct/Temporary Faculty",
                     "Graduate Assistants",
-                    "Student")
+                    "Students")
 
 ## Define Bargaining Units =====================================================
 bargaining_unit_list <- c('UAFT Faculty', 'Local 6070', 'UNAC Faculty', 'UNAD Adjunct Faculty')
@@ -54,20 +54,14 @@ headcount_data <- read_excel("data/headcount_data.xlsx") |>
   janitor::clean_names() |> 
   filter(substr(term_code, 5, 6) %in% c('01', '03'),
          substr(term_code, 1, 4) >= 2013) |> 
-  mutate(emp_type = case_when(job_class_primary_code %in% c("NR", "XR", "EX", "CR") ~ "Regular Staff",
-                              job_class_primary_code %in% c("F9", "FR", "FN", "A9", "AR") ~ "Regular Faculty",
-                              job_class_primary_code %in% c("NT", "NX", "XT", "XX", "CT") ~ "Temporary Staff",
-                              job_class_primary_code %in% c("FT", "FW") ~ "Temporary Faculty",
-                              job_class_primary_code %in% c("GN", "GT") ~ "Graduate Student",
-                              job_class_primary_code %in% c("SN", "ST") ~ "Student"),
-         ir_group = case_when(job_class_primary_code %in% c("FR", "AR") ~ "Academic Administrators",
+  mutate(ir_group = case_when(job_class_primary_code %in% c("FR", "AR") ~ "Academic Administrators",
                               job_class_primary_code %in% c("EX") ~ "Officers and Senior Administrators",
                               job_class_primary_code %in% c("NR", "XR", "CR") ~ "Regular Staff",
                               job_class_primary_code %in% c("NT", "NX", "XT", "XX", "CT") ~ "Temporary Staff",
                               job_class_primary_code %in% c("GN", "GT") ~ "Graduate Assistants",
                               job_class_primary_code %in% c("F9", "FN", "A9") ~ "Regular Faculty",
                               job_class_primary_code %in% c("FT", "FW") ~ "Adjunct/Temporary Faculty",
-                              job_class_primary_code %in% c("SN", "ST") ~ "Student"),
+                              job_class_primary_code %in% c("SN", "ST") ~ "Students"),
          fy = str_c('FY', str_sub(char(fiscal_year), 3, 4)),
          mau_title = case_match(mau_code,
                                 "SPS" ~ "System Office",
@@ -287,12 +281,24 @@ f_hct_by_employee_type('UAS')
 ### System Office, Enterprise Entities, and Education Trust of Alaska
 
 ```{r}
-#| label: Current SO Headcount by Employee Type
+#| label: Current SO and Others Headcount by Employee Type
 #| echo: false
 
 f_hct_by_employee_type(so_maus)
 
 ```
+
+### System Office
+
+```{r}
+#| label: Current SO Headcount by Employee Type
+#| echo: false
+
+f_hct_by_employee_type('System Office')
+
+```
+
+\newpage
 
 # Notes
 
@@ -300,47 +306,59 @@ Data Origin: RPTP - Institutional Research Freeze Data
 
 Data Extract Date: `r extract_date`
 
-Groups of fewer than `r demographic_threshold` employees will not display demographic information.
+Demographic Data for groups of fewer than `r demographic_threshold` employees has been redacted from the table. The total counts are not affected and include the complete population.
 
 ## Definitions
 
-#### Enterprise Entities
+All fields below can be assumed to be as of the Data Extract Date listed in the report.
 
-This group is the Education Trust of Alaska
+#### Headcount
 
-```{r}
-#| label: current ua headcount by IR Group
-#| echo: false
-#| fig-width: 8
-#| fig-asp: 0.618
+A count of unique employees within each group listed.
 
-#max_ir_group_xlim <- headcount_data |> 
-#  filter(seq_no == 1) |> 
-#  count(ir_group) |> 
-#  slice_max(n) |> 
-#  select(n) |> 
-#  mutate(n = round(n * 1.10))
+#### Employee Type
 
-# max_ir_group_xlim <- max_ir_group_xlim$n
+A grouping of employees for simplicity of representation. See the following table:
 
-#headcount_data |> 
-#  filter(seq_no == 1) |> 
-#  count(ir_group) |> 
-#  mutate(ir_group = factor(ir_group,
-#                    levels = rev(ir_group_order))) |> # Use this to reorder factors for bar charts (rev for reverse order)
-#  ggplot(aes(y = ir_group, x = n)) +
-#  geom_bar(stat = 'identity') +
-#  geom_text(aes(label = n), hjust = -.1) +
-#  xlim(NA, max_ir_group_xlim) +
-#  labs(title = "Employees by IR Group",
-#       x = "Employees",
-#       y = NULL)
+| **Employee Type**                  | **Employee ECLS**  |
+|------------------------------------|--------------------|
+| Academic Administrators            | FR                 |
+| Officers and Senior Administrators | EX                 |
+| Regular Staff                      | NR, XR, CR         |
+| Temporary Staff                    | NT, NX, XT, XX, CT |
+| Regular Faculty                    | F9, FN             |
+| Adjunct/ Temporary Faculty         | FT, FW             |
+| Graduate Assistants                | GN, GT             |
+| Students                           | SN, ST             |
 
-```
+#### Full Time
 
-```{r}
-#| label: scratch
-#| include: false
+Employees whose bi-weekly hours amount to a full-time workload (80 hours).
 
+#### Regular
 
-```
+Employees who held employment with the university in a non-temporary status. Employee Classes include CR, EX, FR, F8, FN, NR, and XR.
+
+#### Represented
+
+Any employee who is covered by one of the following:
+
+-   UNAC Faculty (F9)
+
+-   UNAD Adjunct Faculty (FT)
+
+-   Local 6070 (CR, CT)
+
+The UAFFA union is not presently included in the IR data freeze.
+
+#### Female
+
+Any employee who identifies as "Female".
+
+#### Person of Color
+
+Any employee who indicated they considered themselves to be with at least one race other than "White".
+
+#### Age
+
+The age of the employee, in years, as of the data extract date.
